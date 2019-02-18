@@ -1,0 +1,44 @@
+package route
+
+import (
+	"gonote/framework"
+	"gonote/framework/logger"
+)
+
+type fixRoute map[string]func(ctx *framework.Context)
+
+type FixRouter struct {
+	fixRouteMethodMap map[string]fixRoute
+}
+
+func (this *FixRouter) AddRoute(method string, pattern string, handler func(ctx *framework.Context)) error {
+	var route fixRoute
+	route, ok := this.fixRouteMethodMap[method]
+	if !ok {
+		route = make(fixRoute, 10)
+		this.fixRouteMethodMap[method] = route
+	}
+
+	h := route[pattern]
+	if h == nil {
+		route[pattern] = handler
+	} else {
+		logger.Warnf("method: %s and path: %s already exist", method, pattern)
+	}
+	return nil
+}
+
+func (this *FixRouter) MatchRoute(method string, path string) (handler func(ctx *framework.Context), param Param) {
+	fixRoute, ok := this.fixRouteMethodMap[method]
+	if ok {
+		handler = fixRoute[path]
+		if handler != nil {
+			return handler, nil
+		}
+	}
+	return nil, nil
+}
+
+func (this *FixRouter) Initialize() {
+	this.fixRouteMethodMap = make(map[string]fixRoute, 6)
+}

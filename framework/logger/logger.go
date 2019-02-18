@@ -16,7 +16,7 @@ const (
 	Trace
 )
 
-var logLevelMap map[string]int = map[string]int{
+var logLevelMap = map[string]int{
 	"fatal": Fatal,
 	"error": Error,
 	"warn":  Warn,

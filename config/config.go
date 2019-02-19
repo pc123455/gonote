@@ -16,6 +16,9 @@ type Config struct {
 		File  string `ymal:"file"`
 		Level string `ymal:"level"`
 	}
+	Mysql struct {
+		Uri string `ymal:"uri"`
+	}
 }
 
 func readConfig(fileanme string) ([]byte, error) {

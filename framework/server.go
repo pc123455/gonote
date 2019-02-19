@@ -35,6 +35,7 @@ func (this *Server) Initialize(ip string, port int) {
 		logger.Infof("收到请求 %q", request.RequestURI)
 		defer func() { println("结束处理") }()
 		handler, param = this.router.MatchRoute(request.Method, request.URL.Path)
+		fmt.Print(param)
 		if handler == nil {
 			handler = handler404
 		}

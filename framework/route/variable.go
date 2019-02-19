@@ -3,6 +3,7 @@ package route
 import (
 	"gonote/framework/context"
 	"gonote/framework/logger"
+	"gonote/framework/utils"
 	"regexp"
 	"strings"
 )
@@ -39,17 +40,17 @@ func (this *pathNode) setHandler(handler func(ctx *context.Context)) {
 	this.handler = handler
 }
 
-func (this *pathNode) match(pathSequence []string) (handler func(ctx *context.Context)) {
+func (this *pathNode) match(pathSequence []string) (handler func(ctx *context.Context), param context.Param) {
 	handler = nil
-
+	param = make(context.Param)
 	if len(pathSequence) <= 0 {
 		// if current path node is the end of path, return handler of current node
-		return this.handler
+		return this.handler, param
 	}
 
 	if this.childs == nil {
 		// current node is a leaf node
-		return nil
+		return nil, param
 	} else {
 		pathWord := pathSequence[0]
 		child := this.childs[pathWord]
@@ -57,24 +58,33 @@ func (this *pathNode) match(pathSequence []string) (handler func(ctx *context.Co
 
 		if child != nil {
 			if len(pathSequence) > 0 {
-				handler = child.match(pathSequence[1:])
+				var childParam context.Param
+				handler, childParam = child.match(pathSequence[1:])
+				if handler != nil {
+					utils.Merge(param, childParam)
+				}
 			}
 		}
 
 		//match variable nodes
 		for k, v := range this.childs {
 			if handler != nil {
-				return handler
+				return handler, param
 			}
 			if variableReg.Match([]byte(k)) {
 				if len(pathWord) > 0 {
-					handler = v.match(pathSequence[1:])
+					var childParam context.Param
+					param[k[1:len(k)-1]] = pathWord
+					handler, childParam = v.match(pathSequence[1:])
+					if handler != nil {
+						utils.Merge(param, childParam)
+					}
 				}
 			}
 		}
 
 	}
-	return handler
+	return handler, param
 
 }
 
@@ -123,7 +133,7 @@ func (this *VariableRouter) MatchRoute(method string, path string) (handler func
 	}
 	path = strings.TrimSpace(path)
 	pathSequence := strings.Split(path, "/")
-	return rootNode.match(pathSequence), param
+	return rootNode.match(pathSequence)
 }
 
 func (this *VariableRouter) Initialize() {

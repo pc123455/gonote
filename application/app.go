@@ -1,9 +1,9 @@
 package application
 
 import (
-	"note/config"
-	"note/framework"
-	"note/logger"
+	"gonote/config"
+	"gonote/framework"
+	"gonote/framework/logger"
 )
 
 var (

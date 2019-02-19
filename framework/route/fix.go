@@ -1,17 +1,17 @@
 package route
 
 import (
-	"gonote/framework"
+	"gonote/framework/context"
 	"gonote/framework/logger"
 )
 
-type fixRoute map[string]func(ctx *framework.Context)
+type fixRoute map[string]func(ctx *context.Context)
 
 type FixRouter struct {
 	fixRouteMethodMap map[string]fixRoute
 }
 
-func (this *FixRouter) AddRoute(method string, pattern string, handler func(ctx *framework.Context)) error {
+func (this *FixRouter) AddRoute(method string, pattern string, handler func(ctx *context.Context)) error {
 	var route fixRoute
 	route, ok := this.fixRouteMethodMap[method]
 	if !ok {
@@ -28,15 +28,16 @@ func (this *FixRouter) AddRoute(method string, pattern string, handler func(ctx 
 	return nil
 }
 
-func (this *FixRouter) MatchRoute(method string, path string) (handler func(ctx *framework.Context), param Param) {
+func (this *FixRouter) MatchRoute(method string, path string) (handler func(ctx *context.Context), param context.Param) {
 	fixRoute, ok := this.fixRouteMethodMap[method]
+	param = context.Param{}
 	if ok {
 		handler = fixRoute[path]
 		if handler != nil {
-			return handler, nil
+			return
 		}
 	}
-	return nil, nil
+	return
 }
 
 func (this *FixRouter) Initialize() {

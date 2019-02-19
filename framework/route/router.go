@@ -1,16 +1,14 @@
 package route
 
 import (
-	"gonote/framework"
+	"gonote/framework/context"
 	"regexp"
 	"strings"
 )
 
-type Param map[string]interface{}
-
 type Router interface {
-	AddRoute(method string, pattern string, handler func(ctx *framework.Context)) error
-	MatchRoute(method string, path string) (handler func(ctx *framework.Context), params Param)
+	AddRoute(method string, pattern string, handler func(ctx *context.Context)) error
+	MatchRoute(method string, path string) (handler func(ctx *context.Context), params context.Param)
 	Initialize()
 }
 
@@ -19,11 +17,13 @@ type baseRouter struct {
 	variableRouter Router
 }
 
-func NewBaseRouter() *baseRouter {
-	return new(baseRouter)
+func NewBaseRouter() (router *baseRouter) {
+	router = new(baseRouter)
+	router.Initialize()
+	return
 }
 
-func (this *baseRouter) AddRoute(method string, pattern string, handler func(ctx *framework.Context)) error {
+func (this *baseRouter) AddRoute(method string, pattern string, handler func(ctx *context.Context)) error {
 	//regex := "(/[a-zA-Z0-9._~-])*(/<[a-zA-Z]+>)(/[a-zA-Z0-9._~-])*"
 	pattern = strings.TrimSpace(pattern)
 	method = strings.ToUpper(strings.TrimSpace(method))
@@ -39,28 +39,23 @@ func (this *baseRouter) AddRoute(method string, pattern string, handler func(ctx
 	return nil
 }
 
-func (this *baseRouter) MatchRoute(method string, path string) (handler func(ctx *framework.Context)) {
+func (this *baseRouter) MatchRoute(method string, path string) (handler func(ctx *context.Context), param context.Param) {
 	method = strings.ToUpper(strings.TrimSpace(method))
-
 	// first, find handler from fix routes
-	handler, _ = this.fixRouter.MatchRoute(method, path)
+	handler, param = this.fixRouter.MatchRoute(method, path)
 	if handler != nil {
-		return handler
+		return
 	}
 
 	// second, find handler from variable route
-	pathSequence := strings.Split(path, "/")
-	currentNode := rootNode
+	handler, param = this.variableRouter.MatchRoute(method, path)
 
-	handler, ok := pathMap[path]
-	if ok {
-		return handler
-	}
-
-	return nil
+	return
 }
 
 func (this *baseRouter) Initialize() {
 	this.fixRouter = new(FixRouter)
+	this.fixRouter.Initialize()
 	this.variableRouter = new(VariableRouter)
+	this.variableRouter.Initialize()
 }

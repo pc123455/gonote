@@ -1,67 +1,81 @@
 package route
 
 import (
-	"gonote/framework"
+	"gonote/framework/context"
 	"gonote/framework/logger"
 	"regexp"
 	"strings"
 )
 
 type pathNode struct {
-	handler func(ctx *framework.Context)
+	handler func(ctx *context.Context)
 	childs  map[string]*pathNode
 }
 
-func (this *pathNode) initialize(handler func(ctx *framework.Context)) {
+func (this *pathNode) initialize(handler func(ctx *context.Context)) {
 	this.handler = handler
-	this.childs = make(map[string]*pathNode, 10)
+	this.childs = nil
 }
 
 func (this *pathNode) getChild(key string) *pathNode {
-	child, ok := this.childs[key]
-	if ok {
-		return child
+	if this.childs == nil {
+		return nil
 	}
-	return nil
+	return this.childs[key]
 }
 
 func (this *pathNode) setChild(key string, node *pathNode) {
+	if this.childs == nil {
+		this.childs = map[string]*pathNode{}
+	}
 	this.childs[key] = node
 }
 
-func (this *pathNode) getHandler() func(ctx *framework.Context) {
+func (this *pathNode) getHandler() func(ctx *context.Context) {
 	return this.handler
 }
 
-func (this *pathNode) setHandler(handler func(ctx *framework.Context)) {
+func (this *pathNode) setHandler(handler func(ctx *context.Context)) {
 	this.handler = handler
 }
 
-func (this *pathNode) match(pathSequence []string) (handler func(ctx *framework.Context)) {
+func (this *pathNode) match(pathSequence []string) (handler func(ctx *context.Context)) {
 	handler = nil
-	pathWord := pathSequence[0]
-	child := this.childs[pathWord]
-	variableReg := regexp.MustCompile("^<[\\w:]*>$")
 
-	if child != nil {
-		if len(pathSequence) > 1 {
-			//if current path node is not leaf node
-			handler = child.match(pathSequence[1:])
-		} else {
-			if child.getHandler() == nil {
-				return handler
+	if len(pathSequence) <= 0 {
+		// if current path node is the end of path, return handler of current node
+		return this.handler
+	}
+
+	if this.childs == nil {
+		// current node is a leaf node
+		return nil
+	} else {
+		pathWord := pathSequence[0]
+		child := this.childs[pathWord]
+		variableReg := regexp.MustCompile("^<[\\w:]*>$")
+
+		if child != nil {
+			if len(pathSequence) > 0 {
+				handler = child.match(pathSequence[1:])
 			}
 		}
-	}
 
-	if len(pathSequence) == 1 {
-		return handler
-	}
-	for k, v := this.childs {
-		if variableReg.Match(k) {
-
+		//match variable nodes
+		for k, v := range this.childs {
+			if handler != nil {
+				return handler
+			}
+			if variableReg.Match([]byte(k)) {
+				if len(pathWord) > 0 {
+					handler = v.match(pathSequence[1:])
+				}
+			}
 		}
+
 	}
+	return handler
+
 }
 
 type VariableRouter struct {
@@ -72,10 +86,9 @@ func (this *VariableRouter) match(node *pathNode, pathSequence []string) {
 
 }
 
-func (this *VariableRouter) AddRoute(method string, pattern string, handler func(ctx *framework.Context)) error {
-	_, ok := this.variableRouteMethodMap[method]
-	var rootNode *pathNode
-	if !ok {
+func (this *VariableRouter) AddRoute(method string, pattern string, handler func(ctx *context.Context)) error {
+	rootNode := this.variableRouteMethodMap[method]
+	if rootNode == nil {
 		rootNode = new(pathNode)
 		rootNode.initialize(nil)
 		this.variableRouteMethodMap[method] = rootNode
@@ -87,7 +100,7 @@ func (this *VariableRouter) AddRoute(method string, pattern string, handler func
 		//iterate node until leaf path
 		nextNode := currentNode.getChild(pathWord)
 		if nextNode == nil {
-			nextNode := new(pathNode)
+			nextNode = new(pathNode)
 			nextNode.initialize(nil)
 			currentNode.setChild(pathWord, nextNode)
 		}
@@ -102,12 +115,17 @@ func (this *VariableRouter) AddRoute(method string, pattern string, handler func
 	return nil
 }
 
-func (this *VariableRouter) MatchRoute(method string, path string) (handler func(ctx *framework.Context), param Param) {
-	rootNode, ok := this.variableRouteMethodMap[method]
-	if rootNode
-	return nil
+func (this *VariableRouter) MatchRoute(method string, path string) (handler func(ctx *context.Context), param context.Param) {
+	rootNode := this.variableRouteMethodMap[method]
+	param = context.Param{}
+	if rootNode == nil {
+		return nil, param
+	}
+	path = strings.TrimSpace(path)
+	pathSequence := strings.Split(path, "/")
+	return rootNode.match(pathSequence), param
 }
 
 func (this *VariableRouter) Initialize() {
-
+	this.variableRouteMethodMap = make(map[string]*pathNode, 6)
 }

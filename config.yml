@@ -4,3 +4,5 @@ net:
 log:
   file: log.txt
   level: info
+mysql:
+  url:

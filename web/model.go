@@ -28,9 +28,15 @@ func delete(uuid string) error {
 }
 
 func get() []Note {
-	rows, _ := app.Db.Query("select * from QRTZ_NOTE")
-	noteList := make([]Note, 1)
+	rows, _ := app.Db.Query("select `name`, `num`, `uuid` from QRTZ_NOTE")
+	defer rows.Close()
+	noteList := make([]Note, 0)
 	for rows.Next() {
-		noteList = append(noteList, Note{})
+		var name string
+		var num int
+		var uuid string
+		rows.Scan(&name, &num, &uuid)
+		noteList = append(noteList, Note{Name: name, Num: num, Uuid: uuid})
 	}
+	return noteList
 }

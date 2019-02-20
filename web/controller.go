@@ -101,5 +101,8 @@ func Delete(ctx *context.Context) {
 }
 
 func Get(ctx *context.Context) {
-
+	noteList := get()
+	ctx.ResponseWriter.Header().Set("Content-Type", "application/json")
+	message, _ := json.Marshal(noteList)
+	ctx.ResponseWriter.Write(message)
 }

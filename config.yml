@@ -5,4 +5,4 @@ log:
   file: log.txt
   level: info
 mysql:
-  url:
+  uri: developer:Travelcloud208!@tcp(10.223.224.72)/hybrid01_message_bus?charset=utf8

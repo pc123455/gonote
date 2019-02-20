@@ -5,6 +5,7 @@ import (
 	"gonote/framework/logger"
 	"gonote/framework/utils"
 	"regexp"
+	"strconv"
 	"strings"
 )
 
@@ -54,7 +55,7 @@ func (this *pathNode) match(pathSequence []string) (handler func(ctx *context.Co
 	} else {
 		pathWord := pathSequence[0]
 		child := this.childs[pathWord]
-		variableReg := regexp.MustCompile("^<[\\w:]*>$")
+		variableReg := regexp.MustCompile("^<[\\w:-]*>$")
 
 		if child != nil {
 			if len(pathSequence) > 0 {
@@ -74,7 +75,29 @@ func (this *pathNode) match(pathSequence []string) (handler func(ctx *context.Co
 			if variableReg.Match([]byte(k)) {
 				if len(pathWord) > 0 {
 					var childParam context.Param
-					param[k[1:len(k)-1]] = pathWord
+					key := k[1 : len(k)-1]
+					if strings.Contains(key, ":") {
+						keySeq := strings.Split(key, ":")
+						paramType := keySeq[0]
+						paramName := keySeq[1]
+						switch paramType {
+						case "int":
+							num, err := strconv.Atoi(pathWord)
+							if err == nil {
+								param[paramName] = num
+							}
+						case "float":
+							num, err := strconv.ParseFloat(pathWord, 64)
+							if err == nil {
+								param[paramName] = num
+							}
+						default:
+							param[paramName] = pathWord
+						}
+					} else {
+						param[key] = pathWord
+					}
+
 					handler, childParam = v.match(pathSequence[1:])
 					if handler != nil {
 						utils.Merge(param, childParam)
@@ -82,7 +105,6 @@ func (this *pathNode) match(pathSequence []string) (handler func(ctx *context.Co
 				}
 			}
 		}
-
 	}
 	return handler, param
 

@@ -39,9 +39,11 @@ func Initialize(filename string, logLevel string) {
 	if err != nil {
 		panic("open logging file failed")
 	}
+	//defer func() {
+	//	f.Close()
+	//}()
 	log.SetOutput(f)
 	log.SetFlags(log.LstdFlags | log.Lshortfile)
-	//defer f.Close()
 }
 
 func Tracef(format string, args ...interface{}) {

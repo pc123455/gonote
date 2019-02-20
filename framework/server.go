@@ -2,10 +2,12 @@ package framework
 
 import (
 	"fmt"
+	"gonote/framework/constant"
 	"gonote/framework/context"
 	"gonote/framework/logger"
 	"gonote/framework/route"
 	"net/http"
+	"runtime/debug"
 )
 
 type Server struct {
@@ -32,14 +34,20 @@ func (this *Server) Initialize(ip string, port int) {
 	http.HandleFunc("/", func(writer http.ResponseWriter, request *http.Request) {
 		var handler func(ctx *context.Context) = nil
 		var param context.Param
-		logger.Infof("收到请求 %q", request.RequestURI)
-		defer func() { logger.Infof("结束处理") }()
+		logger.Infof("%q %q %q ", request.Proto, request.Method, request.RequestURI)
+		defer func() {
+			if err := recover(); err != nil {
+				logger.Errorf(string(debug.Stack()))
+				writer.WriteHeader(constant.InternalServerError)
+			}
+		}()
 		handler, param = this.router.MatchRoute(request.Method, request.URL.Path)
 		if handler == nil {
 			handler = handler404
 		}
 
 		requestCtx := context.Context{writer, request, &param}
+		//writer.Header().Set("Content-Type", "application/json")
 		handler(&requestCtx)
 	})
 }

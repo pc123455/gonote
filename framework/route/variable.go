@@ -3,7 +3,6 @@ package route
 import (
 	"gonote/framework/context"
 	"gonote/framework/logger"
-	"gonote/framework/utils"
 	"regexp"
 	"strconv"
 	"strings"
@@ -62,7 +61,7 @@ func (this *pathNode) match(pathSequence []string) (handler func(ctx *context.Co
 				var childParam context.Param
 				handler, childParam = child.match(pathSequence[1:])
 				if handler != nil {
-					utils.Merge(param, childParam)
+					context.MergeParam(param, childParam)
 				}
 			}
 		}
@@ -100,7 +99,7 @@ func (this *pathNode) match(pathSequence []string) (handler func(ctx *context.Co
 
 					handler, childParam = v.match(pathSequence[1:])
 					if handler != nil {
-						utils.Merge(param, childParam)
+						context.MergeParam(param, childParam)
 					}
 				}
 			}

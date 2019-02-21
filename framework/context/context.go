@@ -47,7 +47,6 @@ func (this *Response) SetStatus(status int) {
 
 func (this *Response) Write(b []byte) {
 	this.content = append(this.content, b...)
-	//this.content = b
 }
 
 type Context struct {

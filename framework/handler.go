@@ -1,6 +1,8 @@
 package framework
 
-import "gonote/framework/context"
+import (
+	"gonote/framework/context"
+)
 
 func handler404(ctx *context.Context) {
 	ctx.Output.SetStatus(404)

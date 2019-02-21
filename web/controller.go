@@ -2,25 +2,17 @@ package web
 
 import (
 	"encoding/json"
-	"gonote/framework/constant"
 	"gonote/framework/context"
-	"gonote/framework/logger"
-	"io/ioutil"
-	"runtime/debug"
+	"net/http"
 )
 
 func Create(ctx *context.Context) {
-	jsonStr, err := ioutil.ReadAll(ctx.Body)
-	if err != nil {
-		logger.Errorf(err.Error())
-		logger.Errorf(string(debug.Stack()))
-		panic("request body read error")
-	}
 	var note struct {
 		Data []interface{}
 		Dict map[string]interface{}
 	}
-	json.Unmarshal(jsonStr, &note)
+	ctx.Input.ReadBody()
+	json.Unmarshal(ctx.Input.RawContent, &note)
 	var name string
 	var num int
 	v := note.Dict["name"]
@@ -28,7 +20,7 @@ func Create(ctx *context.Context) {
 	case string:
 		name = v.(string)
 	default:
-		ctx.WriteHeader(constant.BadRequest)
+		ctx.Output.SetStatus(http.StatusInternalServerError)
 		return
 	}
 
@@ -41,21 +33,21 @@ func Create(ctx *context.Context) {
 	case float64:
 		num = int(v.(float64))
 	default:
-		ctx.WriteHeader(constant.BadRequest)
+		ctx.Output.SetStatus(http.StatusBadRequest)
 		return
 	}
 
-	err = insert(name, num)
+	err := insert(name, num)
 	if err != nil {
 		panic(err.Error())
 	}
-	ctx.ResponseWriter.Header().Set("Content-Type", "application/json")
-	ctx.ResponseWriter.WriteHeader(constant.Created)
 	data := struct {
 		Data string `json:"data"`
 	}{"已添加"}
 	message, _ := json.Marshal(data)
-	ctx.ResponseWriter.Write(message)
+	ctx.Output.Write(message)
+	ctx.Output.SetStatus(200)
+	ctx.Output.ServeJson()
 }
 
 func Update(ctx *context.Context) {
@@ -63,46 +55,40 @@ func Update(ctx *context.Context) {
 		Name *string
 		Num  *int
 	}{}
-	uuid := (*ctx.Param)["uuid"].(string)
-	jsonStr, err := ioutil.ReadAll(ctx.Body)
-	if err != nil {
-		logger.Errorf(err.Error())
-		logger.Errorf(string(debug.Stack()))
-		panic("request body read error")
-	}
-	json.Unmarshal(jsonStr, &data)
+	uuid := ctx.Input.Args["uuid"].(string)
+	json.Unmarshal(ctx.Input.RawContent, &data)
 	if data.Name == nil || data.Num == nil {
-		ctx.WriteHeader(constant.BadRequest)
+		ctx.Output.SetStatus(http.StatusBadRequest)
 		return
 	}
 
 	update(*data.Name, *data.Num, uuid)
-	ctx.ResponseWriter.Header().Set("Content-Type", "application/json")
 	result := struct {
 		Data string `json:"data"`
 	}{"已修改"}
 	message, _ := json.Marshal(result)
-	ctx.ResponseWriter.Write(message)
+	ctx.Output.Write(message)
+	ctx.Output.ServeJson()
 }
 
 func Delete(ctx *context.Context) {
-	uuid := (*ctx.Param)["uuid"].(string)
+	uuid := ctx.Input.Args["uuid"].(string)
 	if uuid == "" {
-		ctx.WriteHeader(constant.BadRequest)
+		ctx.Output.SetStatus(http.StatusBadRequest)
 		return
 	}
 	delete(uuid)
-	ctx.ResponseWriter.Header().Set("Content-Type", "application/json")
 	result := struct {
 		Data string `json:"data"`
 	}{"已删除"}
 	message, _ := json.Marshal(result)
-	ctx.ResponseWriter.Write(message)
+	ctx.Output.Write(message)
+	ctx.Output.ServeJson()
 }
 
 func Get(ctx *context.Context) {
 	noteList := get()
-	ctx.ResponseWriter.Header().Set("Content-Type", "application/json")
 	message, _ := json.Marshal(noteList)
-	ctx.ResponseWriter.Write(message)
+	ctx.Output.Write(message)
+	ctx.Output.ServeJson()
 }

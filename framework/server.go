@@ -2,12 +2,13 @@ package framework
 
 import (
 	"fmt"
-	"gonote/framework/constant"
 	"gonote/framework/context"
 	"gonote/framework/logger"
 	"gonote/framework/route"
+	"gonote/framework/utils"
 	"net/http"
 	"runtime/debug"
+	"strings"
 )
 
 type Server struct {
@@ -20,9 +21,28 @@ type Server struct {
 	preAccessHandlerFunc    func(ctx *context.Context)
 	accessHandlerFunc       func(ctx *context.Context)
 	postAccessHandlerFunc   func(ctx *context.Context)
+	beforeRouteHandlerFunc  func(ctx *context.Context)
 	contentHandlerFunc      func(ctx *context.Context)
 	afterRequestHandlerFunc func(ctx *context.Context)
 	logHandlerFunc          func(ctx *context.Context)
+}
+
+func queryParse(raw string) (param context.Param) {
+	param = make(context.Param)
+	if raw == "" {
+		return
+	}
+	querylist := strings.Split(raw, "&")
+	for _, q := range querylist {
+		kvPair := strings.Split(q, "=")
+		key := kvPair[0]
+		value := ""
+		if len(kvPair) > 1 {
+			value = kvPair[1]
+		}
+		param[key] = value
+	}
+	return
 }
 
 func (this *Server) Initialize(ip string, port int) {
@@ -38,17 +58,41 @@ func (this *Server) Initialize(ip string, port int) {
 		defer func() {
 			if err := recover(); err != nil {
 				logger.Errorf(string(debug.Stack()))
-				writer.WriteHeader(constant.InternalServerError)
+				writer.WriteHeader(http.StatusInternalServerError)
 			}
 		}()
+
 		handler, param = this.router.MatchRoute(request.Method, request.URL.Path)
 		if handler == nil {
 			handler = handler404
 		}
 
-		requestCtx := context.Context{writer, request, &param}
-		//writer.Header().Set("Content-Type", "application/json")
-		handler(&requestCtx)
+		queryParam := queryParse(request.URL.RawQuery)
+		utils.Merge(param, queryParam)
+		ctx := context.Context{
+			Input: context.Request{
+				Request:    request,
+				Args:       param,
+				RawContent: nil,
+			},
+			Output: context.Response{
+				Writer: writer,
+			},
+		}
+
+		contentType := request.Header.Get("Content-Type")
+		if strings.ToLower(contentType) == "application/json" {
+			request.Body.Read(ctx.Input.RawContent)
+			//if n > 0 && err == nil {
+			//	body := make(map[string]interface{})
+			//	json.Unmarshal(rowContent, body)
+			//
+			//	//merge args
+			//	utils.Merge(ctx.Input.Args, body)
+			//}
+		}
+
+		handler(&ctx)
 	})
 }
 

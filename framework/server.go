@@ -1,6 +1,7 @@
 package framework
 
 import (
+	"errors"
 	"fmt"
 	"go/types"
 	"gonote/framework/context"
@@ -57,6 +58,7 @@ func (this *Server) Initialize(ip string, port int) {
 		Addr:           fmt.Sprintf(":%v", port),
 		MaxHeaderBytes: 1 << 30,
 	}
+
 	//initialize error handler
 	this.errHandlerMap = make(ErrorHandlerMap)
 	this.defaultErrorHandlerFunc = handlerOtherError
@@ -107,14 +109,12 @@ func (this *Server) Initialize(ip string, port int) {
 				handler = this.handlerRouteFunc(ctx)
 				currentStage++
 				continue
-				//ctx.NextStage()
 			case BeforeContentProcessStage:
 				currentHandlers = this.beforeContentHandlers
 			case ContentProcessStage:
 				handler(ctx)
 				currentStage++
 				continue
-				//ctx.NextStage()
 			case AfterContentProcessStage:
 				currentHandlers = this.afterContentHandlers
 				ctx.Output.Write()
@@ -140,6 +140,26 @@ func (this *Server) Initialize(ip string, port int) {
 			}
 		}
 	})
+}
+
+func (this *Server) AppendFilterHandler(stage int, handler HandlerFunc) error {
+	switch stage {
+	case PreAccessStage:
+		this.preAccessHandlers = append(this.preAccessHandlers, handler)
+	case AccessStage:
+		this.accessHandlers = append(this.accessHandlers, handler)
+	case BeforeRouteStage:
+		this.beforeRouteHandlers = append(this.beforeRouteHandlers, handler)
+	case BeforeContentProcessStage:
+		this.beforeRouteHandlers = append(this.beforeContentHandlers, handler)
+	case AfterContentProcessStage:
+		this.afterContentHandlers = append(this.afterContentHandlers, handler)
+	case LogStage:
+		this.logHandlers = append(this.logHandlers, handler)
+	default:
+		return errors.New("stage wrong")
+	}
+	return nil
 }
 
 func queryParse(raw string) (param context.Param) {

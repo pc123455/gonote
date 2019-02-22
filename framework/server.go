@@ -11,6 +11,23 @@ import (
 	"strings"
 )
 
+const (
+	//frequency limit, concurrency limit, etc.
+	PreAccessStage = iota
+	//authentication
+	AccessStage
+	//filter before route
+	BeforeRouteStage
+	RouteStage
+	//filter before execute handler
+	BeforeContentProcessStage
+	ContentProcessStage
+	//filter after execute handler
+	AfterContentProcessStage
+	//log statistics info
+	LogStage
+)
+
 type HandlerFunc func(ctx *context.Context)
 
 type ErrorHandlerMap map[int]HandlerFunc
@@ -24,14 +41,12 @@ type Server struct {
 	errHandlerMap           ErrorHandlerMap
 	defaultErrorHandlerFunc HandlerFunc
 
-	configReadHandlerFunc   HandlerFunc
-	preAccessHandlerFunc    HandlerFunc
-	accessHandlerFunc       HandlerFunc
-	postAccessHandlerFunc   HandlerFunc
-	beforeRouteHandlerFunc  HandlerFunc
-	contentHandlerFunc      HandlerFunc
-	afterRequestHandlerFunc HandlerFunc
-	logHandlerFunc          HandlerFunc
+	preAccessHandlers     []HandlerFunc
+	accessHandlers        []HandlerFunc
+	beforeRouteHandlers   []HandlerFunc
+	beforeContentHandlers []HandlerFunc
+	afterContentHandlers  []HandlerFunc
+	logHandlers           []HandlerFunc
 }
 
 func (this *Server) Initialize(ip string, port int) {
@@ -42,6 +57,14 @@ func (this *Server) Initialize(ip string, port int) {
 	}
 	this.errHandlerMap = make(ErrorHandlerMap)
 	this.defaultErrorHandlerFunc = handlerOtherError
+
+	this.preAccessHandlers = make([]HandlerFunc, 0)
+	this.accessHandlers = make([]HandlerFunc, 0)
+	this.beforeRouteHandlers = make([]HandlerFunc, 0)
+	this.beforeContentHandlers = []HandlerFunc{handlerParseParamFunc}
+	this.afterContentHandlers = make([]HandlerFunc, 0)
+	this.logHandlers = make([]HandlerFunc, 0)
+
 	http.HandleFunc("/", func(writer http.ResponseWriter, request *http.Request) {
 		var handler HandlerFunc = nil
 		logger.Infof("%q %q %q ", request.Proto, request.Method, request.RequestURI)
@@ -65,28 +88,51 @@ func (this *Server) Initialize(ip string, port int) {
 			}
 		}()
 
-		ctx := context.Context{
-			Input: context.Request{
-				Request:    request,
-				Args:       make(context.Param),
-				RawContent: nil,
-			},
-			Output: context.Response{
-				Writer: writer,
-			},
-		}
+		currentStage := PreAccessStage
+		handlerIndex := 0
+		var currentHandlers []HandlerFunc
+		ctx := context.NewContext(writer, request)
 		//config phase
-		if this.configReadHandlerFunc != nil {
-			this.configReadHandlerFunc(&ctx)
+		for {
+			switch currentStage {
+			case PreAccessStage:
+				currentHandlers = this.preAccessHandlers
+			case AccessStage:
+				currentHandlers = this.accessHandlers
+			case BeforeRouteStage:
+				currentHandlers = this.beforeRouteHandlers
+			case RouteStage:
+				handler = this.handlerRouteFunc(ctx)
+				ctx.NextStage()
+			case BeforeContentProcessStage:
+				currentHandlers = this.beforeContentHandlers
+			case ContentProcessStage:
+				handler(ctx)
+				ctx.NextStage()
+			case AfterContentProcessStage:
+				currentHandlers = this.afterContentHandlers
+				ctx.Output.Write()
+			case LogStage:
+				currentHandlers = this.logHandlers
+			default:
+				break
+			}
+
+			length := len(currentHandlers)
+			if handlerIndex <= length {
+				currentHandlers[handlerIndex](ctx)
+			} else {
+				handlerIndex = 0
+				currentStage++
+			}
+			if ctx.IsStageOver() {
+				currentStage++
+				handlerIndex = 0
+				ctx.ResetStageOver()
+			} else {
+				handlerIndex++
+			}
 		}
-
-		handler = this.handlerRouteFunc(&ctx)
-
-		this.handlerParseParamFunc(&ctx)
-
-		handler(&ctx)
-
-		ctx.Output.Write()
 	})
 }
 
@@ -95,8 +141,8 @@ func queryParse(raw string) (param context.Param) {
 	if raw == "" {
 		return
 	}
-	querylist := strings.Split(raw, "&")
-	for _, q := range querylist {
+	queryList := strings.Split(raw, "&")
+	for _, q := range queryList {
 		kvPair := strings.Split(q, "=")
 		key := kvPair[0]
 		value := ""
@@ -108,7 +154,7 @@ func queryParse(raw string) (param context.Param) {
 	return
 }
 
-func (this *Server) handlerParseParamFunc(ctx *context.Context) {
+func handlerParseParamFunc(ctx *context.Context) {
 	queryParam := queryParse(ctx.Input.URL.RawQuery)
 	context.MergeParam(ctx.Input.Args, queryParam)
 	contentType := ctx.Input.Header.Get("Content-Type")

@@ -18,9 +18,11 @@ const (
 	AccessStage
 	//filter before route
 	BeforeRouteStage
+	//route can not be customized
 	RouteStage
 	//filter before execute handler
 	BeforeContentProcessStage
+	//content process can not be customized
 	ContentProcessStage
 	//filter after execute handler
 	AfterContentProcessStage
@@ -55,9 +57,11 @@ func (this *Server) Initialize(ip string, port int) {
 		Addr:           fmt.Sprintf(":%v", port),
 		MaxHeaderBytes: 1 << 30,
 	}
+	//initialize error handler
 	this.errHandlerMap = make(ErrorHandlerMap)
 	this.defaultErrorHandlerFunc = handlerOtherError
 
+	//initialize handlers
 	this.preAccessHandlers = make([]HandlerFunc, 0)
 	this.accessHandlers = make([]HandlerFunc, 0)
 	this.beforeRouteHandlers = make([]HandlerFunc, 0)
@@ -68,6 +72,7 @@ func (this *Server) Initialize(ip string, port int) {
 	http.HandleFunc("/", func(writer http.ResponseWriter, request *http.Request) {
 		var handler HandlerFunc = nil
 		logger.Infof("%q %q %q ", request.Proto, request.Method, request.RequestURI)
+		ctx := context.NewContext(writer, request)
 		defer func() {
 			err := recover()
 			switch err.(type) {
@@ -78,20 +83,17 @@ func (this *Server) Initialize(ip string, port int) {
 				if errHandler == nil {
 					errHandler = this.defaultErrorHandlerFunc
 				}
-				ctx := httpError.GetContext()
-				if ctx != nil {
-					ctx.Output.Write()
-				}
+				errHandler(ctx)
 			default:
 				logger.Errorf(string(debug.Stack()))
 				writer.WriteHeader(http.StatusInternalServerError)
 			}
+			ctx.Output.Write()
 		}()
 
 		currentStage := PreAccessStage
 		handlerIndex := 0
 		var currentHandlers []HandlerFunc
-		ctx := context.NewContext(writer, request)
 		//config phase
 		for {
 			switch currentStage {
@@ -103,12 +105,16 @@ func (this *Server) Initialize(ip string, port int) {
 				currentHandlers = this.beforeRouteHandlers
 			case RouteStage:
 				handler = this.handlerRouteFunc(ctx)
-				ctx.NextStage()
+				currentStage++
+				continue
+				//ctx.NextStage()
 			case BeforeContentProcessStage:
 				currentHandlers = this.beforeContentHandlers
 			case ContentProcessStage:
 				handler(ctx)
-				ctx.NextStage()
+				currentStage++
+				continue
+				//ctx.NextStage()
 			case AfterContentProcessStage:
 				currentHandlers = this.afterContentHandlers
 				ctx.Output.Write()
@@ -119,18 +125,18 @@ func (this *Server) Initialize(ip string, port int) {
 			}
 
 			length := len(currentHandlers)
-			if handlerIndex <= length {
+			if handlerIndex < length {
 				currentHandlers[handlerIndex](ctx)
+				handlerIndex++
 			} else {
 				handlerIndex = 0
 				currentStage++
 			}
+			//is current stage terminated
 			if ctx.IsStageOver() {
 				currentStage++
 				handlerIndex = 0
 				ctx.ResetStageOver()
-			} else {
-				handlerIndex++
 			}
 		}
 	})
@@ -175,7 +181,7 @@ func (this *Server) handlerRouteFunc(ctx *context.Context) (handler HandlerFunc)
 	if handler == nil {
 		ctx.Abort(context.HttpError{
 			Status:  http.StatusNotFound,
-			Message: "not found",
+			Message: []byte("not found"),
 		})
 	}
 	if param != nil {

@@ -7,25 +7,25 @@ import (
 
 func handlerBadRequest(ctx *context.Context) {
 	ctx.Output.SetStatus(http.StatusBadRequest)
-	ctx.Output.AppendContent([]byte("400 bad request"))
+	ctx.Output.AppendContent(ctx.Output.Error.Message)
 }
 
 func handlerUnauthorized(ctx *context.Context) {
 	ctx.Output.SetStatus(http.StatusUnauthorized)
-	ctx.Output.AppendContent([]byte("401 unauthorized"))
+	ctx.Output.AppendContent(ctx.Output.Error.Message)
 }
 
 func handlerForbidden(ctx *context.Context) {
 	ctx.Output.SetStatus(http.StatusForbidden)
-	ctx.Output.AppendContent([]byte("403 forbidden"))
+	ctx.Output.AppendContent(ctx.Output.Error.Message)
 }
 
 func handlerNotFound(ctx *context.Context) {
 	ctx.Output.SetStatus(http.StatusNotFound)
-	ctx.Output.AppendContent([]byte("404 not found"))
+	ctx.Output.AppendContent(ctx.Output.Error.Message)
 }
 
 func handlerOtherError(ctx *context.Context) {
 	ctx.Output.SetStatus(ctx.Output.Error.Status)
-	ctx.Output.AppendContent([]byte(ctx.Output.Error.Message))
+	ctx.Output.AppendContent(ctx.Output.Error.Message)
 }

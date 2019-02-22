@@ -20,8 +20,7 @@ func Create(ctx *context.Context) {
 	case string:
 		name = v.(string)
 	default:
-		ctx.Output.SetStatus(http.StatusInternalServerError)
-		return
+		ctx.Abort(context.HttpError{Status: http.StatusBadRequest, Message: []byte("400 BadRequest")})
 	}
 
 	v = note.Dict["num"]
@@ -33,8 +32,7 @@ func Create(ctx *context.Context) {
 	case float64:
 		num = int(v.(float64))
 	default:
-		ctx.Output.SetStatus(http.StatusBadRequest)
-		return
+		ctx.Abort(context.HttpError{Status: http.StatusBadRequest, Message: []byte("400 BadRequest")})
 	}
 
 	err := insert(name, num)
@@ -45,7 +43,7 @@ func Create(ctx *context.Context) {
 		Data string `json:"data"`
 	}{"已添加"}
 	message, _ := json.Marshal(data)
-	ctx.Output.Write(message)
+	ctx.Output.AppendContent(message)
 	ctx.Output.SetStatus(200)
 	ctx.Output.ServeJson()
 }
@@ -58,8 +56,7 @@ func Update(ctx *context.Context) {
 	uuid := ctx.Input.Args["uuid"].(string)
 	json.Unmarshal(ctx.Input.RawContent, &data)
 	if data.Name == nil || data.Num == nil {
-		ctx.Output.SetStatus(http.StatusBadRequest)
-		return
+		ctx.Abort(context.HttpError{Status: http.StatusBadRequest, Message: []byte("400 BadRequest")})
 	}
 
 	update(*data.Name, *data.Num, uuid)
@@ -67,28 +64,27 @@ func Update(ctx *context.Context) {
 		Data string `json:"data"`
 	}{"已修改"}
 	message, _ := json.Marshal(result)
-	ctx.Output.Write(message)
+	ctx.Output.AppendContent(message)
 	ctx.Output.ServeJson()
 }
 
 func Delete(ctx *context.Context) {
 	uuid := ctx.Input.Args["uuid"].(string)
 	if uuid == "" {
-		ctx.Output.SetStatus(http.StatusBadRequest)
-		return
+		ctx.Abort(context.HttpError{Status: http.StatusBadRequest, Message: []byte("400 BadRequest")})
 	}
 	delete(uuid)
 	result := struct {
 		Data string `json:"data"`
 	}{"已删除"}
 	message, _ := json.Marshal(result)
-	ctx.Output.Write(message)
+	ctx.Output.AppendContent(message)
 	ctx.Output.ServeJson()
 }
 
 func Get(ctx *context.Context) {
 	noteList := get()
 	message, _ := json.Marshal(noteList)
-	ctx.Output.Write(message)
+	ctx.Output.AppendContent(message)
 	ctx.Output.ServeJson()
 }

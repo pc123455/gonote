@@ -7,7 +7,9 @@ import (
 	"gonote/framework/context"
 	"gonote/framework/logger"
 	"gonote/framework/route"
+	"net"
 	"net/http"
+	"path"
 	"runtime/debug"
 	"strings"
 )
@@ -35,18 +37,6 @@ type HandlerFunc func(ctx *context.Context)
 
 type Handler struct {
 	handle func(writer http.ResponseWriter, request *http.Request)
-}
-
-func (h Handler) ServeHTTP(writer http.ResponseWriter, request *http.Request) {
-	h.handle(writer, request)
-}
-
-type ErrorHandlerMap map[int]HandlerFunc
-
-type Server struct {
-	BindIP string
-	Port   int
-	server *http.Server
 	router route.Router
 
 	errHandlerMap           ErrorHandlerMap
@@ -60,100 +50,123 @@ type Server struct {
 	logHandlers           []HandlerFunc
 }
 
-func (this *Server) Initialize(ip string, port int) {
-	this.router = route.NewBaseRouter()
-
-	var handler = Handler{handle: func(writer http.ResponseWriter, request *http.Request) {
-		var handler HandlerFunc = nil
-		logger.Infof("%q %q %q ", request.Proto, request.Method, request.RequestURI)
-		ctx := context.NewContext(writer, request)
-		defer func() {
-			err := recover()
-			switch err.(type) {
-			case types.Nil:
-			case context.HttpError:
-				httpError := err.(context.HttpError)
-				errHandler := this.errHandlerMap[httpError.Status]
-				if errHandler == nil {
-					errHandler = this.defaultErrorHandlerFunc
-				}
-				errHandler(ctx)
-			default:
-				logger.Errorf(string(debug.Stack()))
-				writer.WriteHeader(http.StatusInternalServerError)
-			}
-			ctx.Output.Write()
-		}()
-
-		currentStage := PreAccessStage
-		handlerIndex := 0
-		var currentHandlers []HandlerFunc
-		//config phase
-		for {
-			switch currentStage {
-			case PreAccessStage:
-				currentHandlers = this.preAccessHandlers
-			case AccessStage:
-				currentHandlers = this.accessHandlers
-			case BeforeRouteStage:
-				currentHandlers = this.beforeRouteHandlers
-			case RouteStage:
-				handler = this.handlerRouteFunc(ctx)
-				currentStage++
-				continue
-			case BeforeContentProcessStage:
-				currentHandlers = this.beforeContentHandlers
-			case ContentProcessStage:
-				handler(ctx)
-				currentStage++
-				continue
-			case AfterContentProcessStage:
-				currentHandlers = this.afterContentHandlers
-				ctx.Output.Write()
-			case LogStage:
-				currentHandlers = this.logHandlers
-			default:
-				break
-			}
-
-			length := len(currentHandlers)
-			if handlerIndex < length {
-				currentHandlers[handlerIndex](ctx)
-				handlerIndex++
-			} else {
-				handlerIndex = 0
-				currentStage++
-			}
-			//is current stage terminated
-			if ctx.IsStageOver() {
-				currentStage++
-				handlerIndex = 0
-				ctx.ResetStageOver()
-			}
+func (h Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	if r.RequestURI == "*" {
+		if r.ProtoAtLeast(1, 1) {
+			w.Header().Set("Connection", "close")
 		}
-	}}
-
-	this.server = &http.Server{
-		Addr:           fmt.Sprintf(":%v", port),
-		Handler:        handler,
-		MaxHeaderBytes: 1 << 30,
+		w.WriteHeader(http.StatusBadRequest)
+		return
 	}
 
-	//initialize error handler
-	this.errHandlerMap = make(ErrorHandlerMap)
-	this.defaultErrorHandlerFunc = handlerOtherError
+	// CONNECT requests are not canonicalized.
+	if r.Method == "CONNECT" {
+		// If r.URL.Path is /tree and its handler is not registered,
+		// the /tree -> /tree/ redirect applies to CONNECT requests
+		// but the path canonicalization does not.
+		w.WriteHeader(http.StatusNotImplemented)
+		return
+	}
 
-	//initialize handlers
-	this.preAccessHandlers = make([]HandlerFunc, 0)
-	this.accessHandlers = make([]HandlerFunc, 0)
-	this.beforeRouteHandlers = make([]HandlerFunc, 0)
-	this.beforeContentHandlers = []HandlerFunc{handlerParseParamFunc}
-	this.afterContentHandlers = make([]HandlerFunc, 0)
-	this.logHandlers = make([]HandlerFunc, 0)
+	// All other requests have any port stripped and path cleaned
+	// before passing to mux.handler.
 
+	//host := stripHostPort(r.Host)
+	path := cleanPath(r.URL.Path)
+
+	if path != r.URL.Path {
+		//_, pattern = mux.handler(host, path)
+		url := *r.URL
+		url.Path = path
+		//return http.RedirectHandler(url.String(), StatusMovedPermanently), pattern
+	}
+
+	var handler HandlerFunc = nil
+	logger.Infof("%q %q %q ", r.Proto, r.Method, r.RequestURI)
+	ctx := context.NewContext(w, r)
+
+	defer func() {
+		err := recover()
+		switch err.(type) {
+		case types.Nil:
+		case context.HttpError:
+			httpError := err.(context.HttpError)
+			errHandler := h.errHandlerMap[httpError.Status]
+			if errHandler == nil {
+				errHandler = h.defaultErrorHandlerFunc
+			}
+			errHandler(ctx)
+		default:
+			logger.Errorf(string(debug.Stack()))
+			ctx.Output.SetStatus(http.StatusInternalServerError)
+		}
+		ctx.Output.Write()
+	}()
+
+	currentStage := PreAccessStage
+	handlerIndex := 0
+	var currentHandlers []HandlerFunc
+	//config phase
+	for {
+		switch currentStage {
+		case PreAccessStage:
+			currentHandlers = h.preAccessHandlers
+		case AccessStage:
+			currentHandlers = h.accessHandlers
+		case BeforeRouteStage:
+			currentHandlers = h.beforeRouteHandlers
+		case RouteStage:
+			handler = h.handlerRouteFunc(ctx)
+			currentStage++
+			continue
+		case BeforeContentProcessStage:
+			currentHandlers = h.beforeContentHandlers
+		case ContentProcessStage:
+			handler(ctx)
+			currentStage++
+			continue
+		case AfterContentProcessStage:
+			currentHandlers = h.afterContentHandlers
+			ctx.Output.Write()
+		case LogStage:
+			currentHandlers = h.logHandlers
+		default:
+			break
+		}
+
+		length := len(currentHandlers)
+		if handlerIndex < length {
+			currentHandlers[handlerIndex](ctx)
+			handlerIndex++
+		} else {
+			handlerIndex = 0
+			currentStage++
+		}
+		//is current stage terminated
+		if ctx.IsStageOver() {
+			currentStage++
+			handlerIndex = 0
+			ctx.ResetStageOver()
+		}
+	}
 }
 
-func (this *Server) AppendFilterHandler(stage int, handler HandlerFunc) error {
+func (h *Handler) Initialize() {
+
+	//initialize error handler
+	h.errHandlerMap = make(ErrorHandlerMap)
+	h.defaultErrorHandlerFunc = handlerOtherError
+
+	//initialize handlers
+	h.preAccessHandlers = make([]HandlerFunc, 0)
+	h.accessHandlers = make([]HandlerFunc, 0)
+	h.beforeRouteHandlers = make([]HandlerFunc, 0)
+	h.beforeContentHandlers = []HandlerFunc{handlerParseParamFunc}
+	h.afterContentHandlers = make([]HandlerFunc, 0)
+	h.logHandlers = make([]HandlerFunc, 0)
+}
+
+func (this *Handler) AppendFilterHandler(stage int, handler HandlerFunc) error {
 	switch stage {
 	case PreAccessStage:
 		this.preAccessHandlers = append(this.preAccessHandlers, handler)
@@ -207,7 +220,7 @@ func handlerParseParamFunc(ctx *context.Context) {
 	}
 }
 
-func (this *Server) handlerRouteFunc(ctx *context.Context) (handler HandlerFunc) {
+func (this *Handler) handlerRouteFunc(ctx *context.Context) (handler HandlerFunc) {
 	handler, param := this.router.MatchRoute(ctx.Input.Method, ctx.Input.URL.Path)
 	if handler == nil {
 		ctx.Abort(context.HttpError{
@@ -221,20 +234,76 @@ func (this *Server) handlerRouteFunc(ctx *context.Context) (handler HandlerFunc)
 	return
 }
 
+func (this *Handler) AddHandleFunc(method, pattern string, handler HandlerFunc) {
+	this.router.AddRoute(method, pattern, handler)
+}
+
+func stripHostPort(h string) string {
+	// If no port on host, return unchanged
+	if strings.IndexByte(h, ':') == -1 {
+		return h
+	}
+	host, _, err := net.SplitHostPort(h)
+	if err != nil {
+		return h // on error, return unchanged
+	}
+	return host
+}
+
+// Return the canonical path for p, eliminating . and .. elements.
+func cleanPath(p string) string {
+	if p == "" {
+		return "/"
+	}
+	if p[0] != '/' {
+		p = "/" + p
+	}
+	np := path.Clean(p)
+	// path.Clean removes trailing slash except for root;
+	// put the trailing slash back if necessary.
+	if p[len(p)-1] == '/' && np != "/" {
+		np += "/"
+	}
+	return np
+}
+
+type ErrorHandlerMap map[int]HandlerFunc
+
+type Server struct {
+	BindIP  string
+	Port    int
+	server  *http.Server
+	handler *Handler
+}
+
 func (this *Server) Get(pattern string, handler HandlerFunc) {
-	this.router.AddRoute("GET", pattern, handler)
+	this.handler.AddHandleFunc("GET", pattern, handler)
 }
 
 func (this *Server) Post(pattern string, handler HandlerFunc) {
-	this.router.AddRoute("POST", pattern, handler)
+	this.handler.AddHandleFunc("POST", pattern, handler)
 }
 
 func (this *Server) Put(pattern string, handler HandlerFunc) {
-	this.router.AddRoute("Put", pattern, handler)
+	this.handler.AddHandleFunc("Put", pattern, handler)
 }
 
 func (this *Server) Delete(pattern string, handler HandlerFunc) {
-	this.router.AddRoute("Delete", pattern, handler)
+	this.handler.AddHandleFunc("Delete", pattern, handler)
+}
+
+func (this *Server) Initialize(ip string, port int) {
+	//this.router = route.NewBaseRouter()
+
+	this.handler = &Handler{
+		router: route.NewBaseRouter(),
+	}
+
+	this.server = &http.Server{
+		Addr:           fmt.Sprintf(":%v", port),
+		Handler:        this.handler,
+		MaxHeaderBytes: 1 << 30,
+	}
 }
 
 func (this *Server) Run() {

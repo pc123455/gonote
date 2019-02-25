@@ -77,9 +77,8 @@ func (this *pathNode) match(pathSequence []string) (handler func(ctx *context.Co
 					key := k[1 : len(k)-1]
 					if strings.Contains(key, ":") {
 						keySeq := strings.Split(key, ":")
-						paramType := keySeq[0]
 						paramName := keySeq[1]
-						switch paramType {
+						switch paramType := keySeq[0]; paramType {
 						case "int":
 							num, err := strconv.Atoi(pathWord)
 							if err == nil {

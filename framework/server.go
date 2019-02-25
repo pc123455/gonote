@@ -33,6 +33,14 @@ const (
 
 type HandlerFunc func(ctx *context.Context)
 
+type Handler struct {
+	handle func(writer http.ResponseWriter, request *http.Request)
+}
+
+func (h Handler) ServeHTTP(writer http.ResponseWriter, request *http.Request) {
+	h.handle(writer, request)
+}
+
 type ErrorHandlerMap map[int]HandlerFunc
 
 type Server struct {
@@ -54,24 +62,8 @@ type Server struct {
 
 func (this *Server) Initialize(ip string, port int) {
 	this.router = route.NewBaseRouter()
-	this.server = &http.Server{
-		Addr:           fmt.Sprintf(":%v", port),
-		MaxHeaderBytes: 1 << 30,
-	}
 
-	//initialize error handler
-	this.errHandlerMap = make(ErrorHandlerMap)
-	this.defaultErrorHandlerFunc = handlerOtherError
-
-	//initialize handlers
-	this.preAccessHandlers = make([]HandlerFunc, 0)
-	this.accessHandlers = make([]HandlerFunc, 0)
-	this.beforeRouteHandlers = make([]HandlerFunc, 0)
-	this.beforeContentHandlers = []HandlerFunc{handlerParseParamFunc}
-	this.afterContentHandlers = make([]HandlerFunc, 0)
-	this.logHandlers = make([]HandlerFunc, 0)
-
-	http.HandleFunc("/", func(writer http.ResponseWriter, request *http.Request) {
+	var handler = Handler{handle: func(writer http.ResponseWriter, request *http.Request) {
 		var handler HandlerFunc = nil
 		logger.Infof("%q %q %q ", request.Proto, request.Method, request.RequestURI)
 		ctx := context.NewContext(writer, request)
@@ -139,7 +131,26 @@ func (this *Server) Initialize(ip string, port int) {
 				ctx.ResetStageOver()
 			}
 		}
-	})
+	}}
+
+	this.server = &http.Server{
+		Addr:           fmt.Sprintf(":%v", port),
+		Handler:        handler,
+		MaxHeaderBytes: 1 << 30,
+	}
+
+	//initialize error handler
+	this.errHandlerMap = make(ErrorHandlerMap)
+	this.defaultErrorHandlerFunc = handlerOtherError
+
+	//initialize handlers
+	this.preAccessHandlers = make([]HandlerFunc, 0)
+	this.accessHandlers = make([]HandlerFunc, 0)
+	this.beforeRouteHandlers = make([]HandlerFunc, 0)
+	this.beforeContentHandlers = []HandlerFunc{handlerParseParamFunc}
+	this.afterContentHandlers = make([]HandlerFunc, 0)
+	this.logHandlers = make([]HandlerFunc, 0)
+
 }
 
 func (this *Server) AppendFilterHandler(stage int, handler HandlerFunc) error {

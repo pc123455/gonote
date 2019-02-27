@@ -19,8 +19,7 @@ func (this *FixRouter) AddRoute(method string, pattern string, handler func(ctx 
 		this.fixRouteMethodMap[method] = route
 	}
 
-	h := route[pattern]
-	if h == nil {
+	if h := route[pattern]; h == nil {
 		route[pattern] = handler
 	} else {
 		logger.Warnf("method: %s and path: %s already exist", method, pattern)

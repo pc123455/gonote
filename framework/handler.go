@@ -162,20 +162,20 @@ func (h *Handler) Initialize() {
 	h.logHandlers = make([]HandlerFunc, 0)
 }
 
-func (this *Handler) AppendFilterHandler(stage int, handler HandlerFunc) error {
+func (h *Handler) AppendFilterHandler(stage int, handler HandlerFunc) error {
 	switch stage {
 	case PreAccessStage:
-		this.preAccessHandlers = append(this.preAccessHandlers, handler)
+		h.preAccessHandlers = append(h.preAccessHandlers, handler)
 	case AccessStage:
-		this.accessHandlers = append(this.accessHandlers, handler)
+		h.accessHandlers = append(h.accessHandlers, handler)
 	case BeforeRouteStage:
-		this.beforeRouteHandlers = append(this.beforeRouteHandlers, handler)
+		h.beforeRouteHandlers = append(h.beforeRouteHandlers, handler)
 	case BeforeContentProcessStage:
-		this.beforeRouteHandlers = append(this.beforeContentHandlers, handler)
+		h.beforeRouteHandlers = append(h.beforeContentHandlers, handler)
 	case AfterContentProcessStage:
-		this.afterContentHandlers = append(this.afterContentHandlers, handler)
+		h.afterContentHandlers = append(h.afterContentHandlers, handler)
 	case LogStage:
-		this.logHandlers = append(this.logHandlers, handler)
+		h.logHandlers = append(h.logHandlers, handler)
 	default:
 		return errors.New("stage wrong")
 	}
@@ -216,8 +216,8 @@ func handlerParseParamFunc(ctx *context.Context) {
 	}
 }
 
-func (this *Handler) handlerRouteFunc(ctx *context.Context) (handler HandlerFunc) {
-	handler, param := this.router.MatchRoute(ctx.Input.Method, ctx.Input.URL.Path)
+func (h *Handler) handlerRouteFunc(ctx *context.Context) (handler HandlerFunc) {
+	handler, param := h.router.MatchRoute(ctx.Input.Method, ctx.Input.URL.Path)
 	if handler == nil {
 		ctx.Abort(context.HttpError{
 			Status:  http.StatusNotFound,
@@ -230,24 +230,24 @@ func (this *Handler) handlerRouteFunc(ctx *context.Context) (handler HandlerFunc
 	return
 }
 
-func (this *Handler) AddHandleFunc(method, pattern string, handler HandlerFunc) {
-	this.router.AddRoute(method, pattern, handler)
+func (h *Handler) AddHandleFunc(method, pattern string, handler HandlerFunc) {
+	h.router.AddRoute(method, pattern, handler)
 }
 
-func (this *Handler) AppendStageHandlerFunc(stage int, handler HandlerFunc) (err error) {
+func (h *Handler) AppendStageHandlerFunc(stage int, handler HandlerFunc) (err error) {
 	switch stage {
 	case PreAccessStage:
-		this.preAccessHandlers = append(this.preAccessHandlers, handler)
+		h.preAccessHandlers = append(h.preAccessHandlers, handler)
 	case AccessStage:
-		this.accessHandlers = append(this.accessHandlers, handler)
+		h.accessHandlers = append(h.accessHandlers, handler)
 	case BeforeRouteStage:
-		this.beforeRouteHandlers = append(this.beforeRouteHandlers, handler)
+		h.beforeRouteHandlers = append(h.beforeRouteHandlers, handler)
 	case BeforeContentProcessStage:
-		this.beforeContentHandlers = append(this.beforeContentHandlers, handler)
+		h.beforeContentHandlers = append(h.beforeContentHandlers, handler)
 	case AfterContentProcessStage:
-		this.afterContentHandlers = append(this.afterContentHandlers, handler)
+		h.afterContentHandlers = append(h.afterContentHandlers, handler)
 	case LogStage:
-		this.logHandlers = append(this.logHandlers, handler)
+		h.logHandlers = append(h.logHandlers, handler)
 	default:
 		err = errors.New("invalid stage")
 	}

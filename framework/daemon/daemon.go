@@ -8,12 +8,13 @@ import (
 
 func Daemon(nochdir, noclose int) (int, error) {
 	if os.Getppid() == 1 {
-		//syscall.Umask(0)
+		syscall.Umask(0)
 		if nochdir == 0 {
 			os.Chdir("/")
 		}
 		return 0, nil
 	}
+
 	files := make([]*os.File, 3, 6)
 	if noclose == 0 {
 		nullDev, err := os.OpenFile("/dev/null", 0, 0)
@@ -29,10 +30,17 @@ func Daemon(nochdir, noclose int) (int, error) {
 	sysattrs := syscall.SysProcAttr{Setsid: true}
 	attrs := os.ProcAttr{Dir: dir, Env: os.Environ(), Files: files, Sys: &sysattrs}
 
+	pidFile, err := os.Open("pid")
+	if err != nil {
+		return -1, fmt.Errorf("create pid file error %s : %s", os.Args[0], err)
+	}
+	defer pidFile.Close()
 	proc, err := os.StartProcess(os.Args[0], os.Args, &attrs)
 	if err != nil {
 		return -1, fmt.Errorf("create porcess error %s : %s", os.Args[0], err)
 	}
+	pidFile.Write([]byte(fmt.Sprintf("%v", proc.Pid)))
+
 	proc.Release()
 	os.Exit(0)
 	return 0, nil

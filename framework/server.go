@@ -75,14 +75,15 @@ func (s *Server) Initialize(ip string, port int) error {
 	s.handler = &Handler{
 		router: route.NewBaseRouter(),
 	}
+	s.handler.Initialize()
 
-	ln, err := net.Listen("tcp", fmt.Sprintf(":%v", port))
-	if err != nil {
-		return err
-	}
-	s.listener = &Listener{
-		ln: ln,
-	}
+	//ln, err := net.Listen("tcp", fmt.Sprintf(":%v", port))
+	//if err != nil {
+	//	return err
+	//}
+	//s.listener = &Listener{
+	//	ln: ln,
+	//}
 
 	s.server = &http.Server{
 		Addr:           fmt.Sprintf(":%v", port),
@@ -90,6 +91,10 @@ func (s *Server) Initialize(ip string, port int) error {
 		MaxHeaderBytes: 1 << 30,
 	}
 	return nil
+}
+
+func (s *Server) GetDoneChan() <-chan struct{} {
+	return s.doneChan
 }
 
 func (s *Server) Run() {

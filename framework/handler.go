@@ -221,7 +221,7 @@ func (h *Handler) handlerRouteFunc(ctx *context.Context) (handler HandlerFunc) {
 	if handler == nil {
 		ctx.Abort(context.HttpError{
 			Status:  http.StatusNotFound,
-			Message: []byte("not found"),
+			Message: []byte("not found\n"),
 		})
 	}
 	if param != nil {

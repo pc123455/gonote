@@ -8,7 +8,6 @@ import (
 	"gonote/framework/logger"
 	"os"
 	"syscall"
-	"time"
 )
 
 var (
@@ -27,8 +26,7 @@ func Initialize(confFile string) (err error) {
 	return
 }
 
-func delayShutdown() {
-	time.Sleep(time.Second * 10)
+func gracefullyShutdown() {
 	Server.Shutdown()
 }
 
@@ -38,12 +36,11 @@ func Run() {
 	for signal := range sigChan {
 		switch signal {
 		case syscall.SIGTERM:
-			Server.Shutdown()
+			gracefullyShutdown()
 		default:
 
 		}
 	}
-	go delayShutdown()
 	Server.Wait()
 	print("server stop")
 }

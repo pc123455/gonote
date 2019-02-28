@@ -3,6 +3,7 @@ package framework
 import (
 	"context"
 	"fmt"
+	"gonote/framework/logger"
 	"gonote/framework/route"
 	"net"
 	"net/http"
@@ -52,26 +53,26 @@ type Server struct {
 	mu       sync.RWMutex
 }
 
-func (this *Server) Get(pattern string, handler HandlerFunc) {
-	this.handler.AddHandleFunc("GET", pattern, handler)
+func (s *Server) Get(pattern string, handler HandlerFunc) {
+	s.handler.AddHandleFunc("GET", pattern, handler)
 }
 
-func (this *Server) Post(pattern string, handler HandlerFunc) {
-	this.handler.AddHandleFunc("POST", pattern, handler)
+func (s *Server) Post(pattern string, handler HandlerFunc) {
+	s.handler.AddHandleFunc("POST", pattern, handler)
 }
 
-func (this *Server) Put(pattern string, handler HandlerFunc) {
-	this.handler.AddHandleFunc("Put", pattern, handler)
+func (s *Server) Put(pattern string, handler HandlerFunc) {
+	s.handler.AddHandleFunc("Put", pattern, handler)
 }
 
-func (this *Server) Delete(pattern string, handler HandlerFunc) {
-	this.handler.AddHandleFunc("Delete", pattern, handler)
+func (s *Server) Delete(pattern string, handler HandlerFunc) {
+	s.handler.AddHandleFunc("Delete", pattern, handler)
 }
 
-func (this *Server) Initialize(ip string, port int) error {
-	this.doneChan = make(chan struct{})
+func (s *Server) Initialize(ip string, port int) error {
+	s.doneChan = make(chan struct{})
 
-	this.handler = &Handler{
+	s.handler = &Handler{
 		router: route.NewBaseRouter(),
 	}
 
@@ -79,29 +80,31 @@ func (this *Server) Initialize(ip string, port int) error {
 	if err != nil {
 		return err
 	}
-	this.listener = &Listener{
+	s.listener = &Listener{
 		ln: ln,
 	}
 
-	this.server = &http.Server{
+	s.server = &http.Server{
 		Addr:           fmt.Sprintf(":%v", port),
-		Handler:        this.handler,
+		Handler:        s.handler,
 		MaxHeaderBytes: 1 << 30,
 	}
 	return nil
 }
 
-func (this *Server) Run() {
-	this.server.ListenAndServe()
+func (s *Server) Run() {
+	err := s.server.ListenAndServe()
+	logger.Errorf(err.Error())
+	close(s.doneChan)
 }
 
-func (this *Server) Wait() {
-	<-this.doneChan
+func (s *Server) Wait() {
+	<-s.doneChan
 }
 
-func (this *Server) Shutdown() {
-	this.server.Shutdown(context.Background())
-	close(this.doneChan)
+func (s *Server) Shutdown() {
+	s.server.Shutdown(context.Background())
+	//close(s.doneChan)
 }
 
 type Listener struct {

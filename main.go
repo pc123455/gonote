@@ -15,8 +15,4 @@ func main() {
 	server.Get("/get/find", web.Get)
 	application.Run()
 
-	//_, error := daemon.Daemon(0, 0)
-	//if error != nil {
-	//}
-
 }

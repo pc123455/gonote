@@ -6,6 +6,7 @@ import (
 	_ "github.com/go-sql-driver/mysql"
 	"gonote/config"
 	"gonote/framework"
+	"gonote/framework/daemon"
 	"gonote/framework/logger"
 	"os"
 	"strconv"
@@ -30,6 +31,12 @@ func Initialize(confFile string) (err error) {
 	flag.BoolVar(&Args.daemon, "daemon", false, "run server in daemon mode")
 	flag.Parse()
 
+	_, err = daemon.Daemon(0, 1)
+
+	if err != nil {
+		return err
+	}
+
 	Config = config.ParseConfigFromFile(confFile)
 	logger.Initialize(Config.Log.File, Config.Log.Level)
 	Server = framework.Server{}
@@ -44,6 +51,7 @@ func gracefullyShutdown() {
 }
 
 func Run() {
+
 	go Server.Run()
 	sigChan := make(chan os.Signal)
 	select {

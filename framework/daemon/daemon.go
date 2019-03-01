@@ -1,44 +1,71 @@
 package daemon
 
 import (
+	"errors"
 	"fmt"
+	"gonote/framework/logger"
 	"os"
 	"os/exec"
+	"strconv"
 	"syscall"
 )
 
+const (
+	stageVar = "__DAEMON_STAGE"
+)
+
+const (
+	stageParent = iota
+	stageChild
+)
+
 func Daemon(nochdir, noclose int) (int, error) {
-	if os.Getppid() == 1 {
+	fmt.Println("sub-process running")
+	id := os.Getpid()
+	fmt.Printf("pid: %v\n", id)
+	fmt.Printf("gid: %v\n", os.Getgid())
+	fmt.Printf("ppid: %v\n", os.Getppid())
+	stage, err := getStage()
+	if err != nil {
+		resetStage()
+		stage = stageParent
+	}
+	if stage == stageChild {
 		// chile process
 		syscall.Umask(0)
 		if nochdir == 0 {
 			os.Chdir("/")
 		}
-		println("sub-process running")
+		resetStage()
+		//os.Exit(0)
 		return 0, nil
 	}
 
 	cmd := exec.Command(os.Args[0])
 	//files := make([]*os.File, 3, 6)
+	nullDev, err := os.OpenFile("/dev/null", 0, 0)
+	if err != nil {
+		return 1, err
+	}
 	if noclose == 0 {
-		nullDev, err := os.OpenFile("/dev/null", 0, 0)
-		if err != nil {
-			return 1, err
-		}
 		cmd.Stdin = nullDev
 		cmd.Stdout = nullDev
 		cmd.Stderr = nullDev
 		//files[0], files[1], files[2] = nullDev, nullDev, nullDev
 	} else {
-		cmd.Stdin = os.Stdin
-		cmd.Stdout = os.Stdout
-		cmd.Stderr = os.Stderr
+		cmd.Stdin = nullDev
+		cmd.Stdout = logger.LogFile
+		cmd.Stderr = logger.LogFile
 		//files[0], files[1], files[2] = os.Stdin, os.Stdout, os.Stderr
 	}
 
 	dir, _ := os.Getwd()
 	sysAttrs := syscall.SysProcAttr{Setsid: true}
 	cmd.SysProcAttr = &sysAttrs
+	err = os.Setenv(stageVar, strconv.Itoa(stageChild))
+	if err != nil {
+		return -1, fmt.Errorf("set enviornment error: %s", err)
+	}
 	cmd.Env = os.Environ()
 	cmd.Dir = dir
 
@@ -49,16 +76,36 @@ func Daemon(nochdir, noclose int) (int, error) {
 		return -1, fmt.Errorf("create pid file error %s : %s", os.Args[0], err)
 	}
 
-	cmd.Start()
+	err = cmd.Start()
 	//proc, err := os.StartProcess(os.Args[0], os.Args, &attrs)
 	if err != nil {
 		return -1, fmt.Errorf("create porcess error %s : %s", os.Args[0], err)
 	}
-	pid := fmt.Sprintf("%v", cmd.Process.Pid)
+	pid := strconv.Itoa(cmd.Process.Pid)
 	pidFile.WriteString(pid)
 	pidFile.Close()
 	cmd.Process.Release()
 	//proc.Release()
+	//time.Sleep(2 * time.Second)
 	os.Exit(0)
 	return 0, nil
+}
+
+func getStage() (int, error) {
+	stageStr := os.Getenv(stageVar)
+	if stageStr == "" {
+		return -1, errors.New("stage is not set")
+	}
+	stage, err := strconv.Atoi(stageStr)
+	if err != nil {
+		return -1, err
+	}
+	if stage > stageChild {
+		return -1, errors.New("stage is invalid")
+	}
+	return stage, nil
+}
+
+func resetStage() error {
+	return os.Setenv(stageVar, strconv.Itoa(stageParent))
 }

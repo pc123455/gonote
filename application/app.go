@@ -3,6 +3,7 @@ package application
 import (
 	"database/sql"
 	"flag"
+	"fmt"
 	_ "github.com/go-sql-driver/mysql"
 	"gonote/config"
 	"gonote/framework"
@@ -31,14 +32,15 @@ func Initialize(confFile string) (err error) {
 	flag.BoolVar(&Args.daemon, "daemon", false, "run server in daemon mode")
 	flag.Parse()
 
+	Config = config.ParseConfigFromFile(confFile)
+	logger.Initialize(Config.Log.File, Config.Log.Level)
+
 	_, err = daemon.Daemon(0, 1)
 
 	if err != nil {
 		return err
 	}
 
-	Config = config.ParseConfigFromFile(confFile)
-	logger.Initialize(Config.Log.File, Config.Log.Level)
 	Server = framework.Server{}
 	Server.Initialize(Config.Net.Bind, Config.Net.Port)
 
@@ -64,7 +66,7 @@ func Run() {
 
 		}
 	}
-	print("server stop")
+	fmt.Print("server stop")
 }
 
 func readDaemonPid() (int, error) {

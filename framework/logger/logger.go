@@ -26,7 +26,10 @@ var logLevelMap = map[string]int{
 }
 
 //var logger *log.Logger
-var level int
+var (
+	level   int
+	LogFile *os.File
+)
 
 func Initialize(filename string, logLevel string) {
 	l, ok := logLevelMap[strings.ToLower(strings.TrimSpace(logLevel))]
@@ -35,14 +38,14 @@ func Initialize(filename string, logLevel string) {
 	}
 	level = l
 
-	f, err := os.OpenFile(filename, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0644)
+	LogFile, err := os.OpenFile(filename, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0644)
 	if err != nil {
 		panic("open logging file failed")
 	}
 	//defer func() {
 	//	f.Close()
 	//}()
-	log.SetOutput(f)
+	log.SetOutput(LogFile)
 	log.SetFlags(log.LstdFlags | log.Lshortfile)
 }
 

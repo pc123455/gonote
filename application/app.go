@@ -20,22 +20,34 @@ var (
 	Db     *sql.DB
 
 	Args struct {
-		stop   bool
-		reload bool
-		daemon bool
+		stop       bool
+		reload     bool
+		daemon     bool
+		configFile string
 	}
 )
 
-func Initialize(confFile string) (err error) {
+func Initialize() (err error) {
 	flag.BoolVar(&Args.stop, "stop", false, "stop the daemon server gracefully")
 	flag.BoolVar(&Args.reload, "reload", false, "reload the config and restart server")
 	flag.BoolVar(&Args.daemon, "daemon", false, "run server in daemon mode")
+	flag.StringVar(&Args.configFile, "config", "config.yml", "config file pat, example '/tmp/config.yml'")
 	flag.Parse()
 
-	Config = config.ParseConfigFromFile(confFile)
+	if Args.stop {
+		GracefullyStopDaemon()
+		os.Exit(0)
+	}
+
+	if Args.reload {
+		ReloadDaemon()
+		os.Exit(0)
+	}
+
+	Config = config.ParseConfigFromFile(Args.configFile)
 	logger.Initialize(Config.Log.File, Config.Log.Level)
 
-	_, err = daemon.Daemon(0, 1)
+	_, err = daemon.Daemon(0, 1, Config.Base.Pid)
 
 	if err != nil {
 		return err
@@ -48,29 +60,59 @@ func Initialize(confFile string) (err error) {
 	return
 }
 
+func Stop() error {
+	err := Db.Close()
+	if err != nil {
+		return fmt.Errorf("db connection close error: %s", err)
+	}
+	logger.Close()
+	return nil
+}
+
 func gracefullyShutdown() {
 	Server.Shutdown()
+}
+
+func reload() error {
+	err := Stop()
+	if err != nil {
+		return err
+	}
+	err = Initialize()
+	return err
 }
 
 func Run() {
 
 	go Server.Run()
 	sigChan := make(chan os.Signal)
-	select {
-	case <-Server.GetDoneChan():
-	case signal := <-sigChan:
-		switch signal {
-		case syscall.SIGTERM:
-			gracefullyShutdown()
-		default:
+	for {
+		select {
+		case <-Server.GetDoneChan():
+			break
+		case signal := <-sigChan:
+			switch signal {
+			case syscall.SIGTERM:
+				gracefullyShutdown()
+			case syscall.SIGUSR1:
+				err := reload()
+				if err != nil {
+					fmt.Println(err)
+					os.Exit(1)
+				}
+			default:
 
+			}
 		}
 	}
 	fmt.Print("server stop")
 }
 
 func readDaemonPid() (int, error) {
-	pidFile, err := os.Open("pid")
+	if Config.Base.Pid == "" {
+		Config.Base.Pid = "pid"
+	}
+	pidFile, err := os.Open(Config.Base.Pid)
 	if err != nil {
 		return 0, err
 	}
@@ -86,11 +128,27 @@ func readDaemonPid() (int, error) {
 	return pid, nil
 }
 
-func SignalNotify(signal syscall.Signal) error {
-	_, err := readDaemonPid()
+func SignalDaeemon(signal syscall.Signal) error {
+	pid, err := readDaemonPid()
 	if err != nil {
 		return err
 	}
-	//syscall.Kill(pid, signal)
+	err = syscall.Kill(pid, signal)
+	return err
+}
+
+func GracefullyStopDaemon() error {
+	err := SignalDaeemon(syscall.SIGTERM)
+	if err != nil {
+		return fmt.Errorf("stop error: %s", err)
+	}
+	return nil
+}
+
+func ReloadDaemon() error {
+	err := SignalDaeemon(syscall.SIGUSR1)
+	if err != nil {
+		return fmt.Errorf("stop error: %s", err)
+	}
 	return nil
 }

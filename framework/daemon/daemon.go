@@ -19,7 +19,7 @@ const (
 	stageChild
 )
 
-func Daemon(nochdir, noclose int) (int, error) {
+func Daemon(nochdir, noclose int, pidFilename string) (int, error) {
 	fmt.Println("sub-process running")
 	id := os.Getpid()
 	fmt.Printf("pid: %v\n", id)
@@ -27,7 +27,10 @@ func Daemon(nochdir, noclose int) (int, error) {
 	fmt.Printf("ppid: %v\n", os.Getppid())
 	stage, err := getStage()
 	if err != nil {
-		resetStage()
+		err = resetStage()
+		if err != nil {
+			return -1, err
+		}
 		stage = stageParent
 	}
 	if stage == stageChild {
@@ -37,10 +40,16 @@ func Daemon(nochdir, noclose int) (int, error) {
 			os.Chdir("/")
 		}
 		resetStage()
+		fmt.Println("child precess start")
 		//os.Exit(0)
 		return 0, nil
 	}
 
+	err = os.Setenv(stageVar, strconv.Itoa(stageChild))
+	if err != nil {
+		fmt.Println("set environment variable error")
+		return -1, err
+	}
 	cmd := exec.Command(os.Args[0])
 	//files := make([]*os.File, 3, 6)
 	nullDev, err := os.OpenFile("/dev/null", 0, 0)
@@ -71,7 +80,7 @@ func Daemon(nochdir, noclose int) (int, error) {
 
 	//attrs := os.ProcAttr{Dir: dir, Env: os.Environ(), Files: files, Sys: &sysAttrs}
 
-	pidFile, err := os.OpenFile("pid", os.O_RDWR|os.O_CREATE|os.O_SYNC, 0644)
+	pidFile, err := os.OpenFile(pidFilename, os.O_RDWR|os.O_CREATE|os.O_SYNC, 0644)
 	if err != nil {
 		return -1, fmt.Errorf("create pid file error %s : %s", os.Args[0], err)
 	}
@@ -79,6 +88,7 @@ func Daemon(nochdir, noclose int) (int, error) {
 	err = cmd.Start()
 	//proc, err := os.StartProcess(os.Args[0], os.Args, &attrs)
 	if err != nil {
+		resetStage()
 		return -1, fmt.Errorf("create porcess error %s : %s", os.Args[0], err)
 	}
 	pid := strconv.Itoa(cmd.Process.Pid)

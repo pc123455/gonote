@@ -49,6 +49,10 @@ func Initialize(filename string, logLevel string) {
 	log.SetFlags(log.LstdFlags | log.Lshortfile)
 }
 
+func Close() {
+	LogFile.Close()
+}
+
 func Tracef(format string, args ...interface{}) {
 	if level >= Trace {
 		log.SetPrefix("Trace ")

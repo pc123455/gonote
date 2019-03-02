@@ -7,7 +7,7 @@ import (
 
 func main() {
 	server := &application.Server
-	application.Initialize("config.yml")
+	application.Initialize()
 
 	server.Post("/create", web.Create)
 	server.Put("/fix/<uuid>", web.Update)

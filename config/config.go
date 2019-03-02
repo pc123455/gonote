@@ -8,6 +8,9 @@ import (
 )
 
 type Config struct {
+	Base struct {
+		Pid string `ymal:"pid"`
+	}
 	Net struct {
 		Bind string `ymal:"bind"`
 		Port int    `ymal:"port"`

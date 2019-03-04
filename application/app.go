@@ -27,7 +27,7 @@ var (
 	}
 )
 
-func Initialize() (err error) {
+func Main() error {
 	flag.BoolVar(&Args.stop, "stop", false, "stop the daemon server gracefully")
 	flag.BoolVar(&Args.reload, "reload", false, "reload the config and restart server")
 	flag.BoolVar(&Args.daemon, "daemon", false, "run server in daemon mode")
@@ -44,13 +44,25 @@ func Initialize() (err error) {
 		os.Exit(0)
 	}
 
+	err := Initialize()
+	if err != nil {
+		return err
+	}
+	Run()
+	return nil
+}
+
+func Initialize() (err error) {
+
 	Config = config.ParseConfigFromFile(Args.configFile)
 	logger.Initialize(Config.Log.File, Config.Log.Level)
 
-	_, err = daemon.Daemon(0, 1, Config.Base.Pid)
+	if Args.daemon {
+		_, err = daemon.Daemon(0, 1, Config.Base.Pid)
 
-	if err != nil {
-		return err
+		if err != nil {
+			return err
+		}
 	}
 
 	Server = framework.Server{}
@@ -86,10 +98,11 @@ func Run() {
 
 	go Server.Run()
 	sigChan := make(chan os.Signal)
+Loop:
 	for {
 		select {
 		case <-Server.GetDoneChan():
-			break
+			break Loop
 		case signal := <-sigChan:
 			switch signal {
 			case syscall.SIGTERM:
@@ -128,7 +141,7 @@ func readDaemonPid() (int, error) {
 	return pid, nil
 }
 
-func SignalDaeemon(signal syscall.Signal) error {
+func SignalDaemon(signal syscall.Signal) error {
 	pid, err := readDaemonPid()
 	if err != nil {
 		return err
@@ -138,7 +151,7 @@ func SignalDaeemon(signal syscall.Signal) error {
 }
 
 func GracefullyStopDaemon() error {
-	err := SignalDaeemon(syscall.SIGTERM)
+	err := SignalDaemon(syscall.SIGTERM)
 	if err != nil {
 		return fmt.Errorf("stop error: %s", err)
 	}
@@ -146,7 +159,7 @@ func GracefullyStopDaemon() error {
 }
 
 func ReloadDaemon() error {
-	err := SignalDaeemon(syscall.SIGUSR1)
+	err := SignalDaemon(syscall.SIGUSR1)
 	if err != nil {
 		return fmt.Errorf("stop error: %s", err)
 	}

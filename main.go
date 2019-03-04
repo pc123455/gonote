@@ -13,6 +13,6 @@ func main() {
 	server.Put("/fix/<uuid>", web.Update)
 	server.Delete("/del/<uuid>", web.Delete)
 	server.Get("/get/find", web.Get)
-	application.Run()
+	application.Main()
 
 }

@@ -1,7 +1,10 @@
+// +build windows
+
 package application
 
 import (
 	"database/sql"
+	"errors"
 	"flag"
 	"fmt"
 	_ "github.com/go-sql-driver/mysql"
@@ -40,7 +43,7 @@ func Main() error {
 	}
 
 	if Args.reload {
-		ReloadDaemon()
+		reloadDaemon()
 		os.Exit(0)
 	}
 
@@ -48,7 +51,7 @@ func Main() error {
 	if err != nil {
 		return err
 	}
-	Run()
+
 	return nil
 }
 
@@ -107,12 +110,14 @@ Loop:
 			switch signal {
 			case syscall.SIGTERM:
 				gracefullyShutdown()
-			case syscall.SIGUSR1:
-				err := reload()
-				if err != nil {
-					fmt.Println(err)
-					os.Exit(1)
-				}
+
+			//todo windows reload
+			//case syscall.SIGUSR1:
+			//err := reload()
+			//if err != nil {
+			//	fmt.Println(err)
+			//	os.Exit(1)
+			//}
 			default:
 
 			}
@@ -142,12 +147,13 @@ func readDaemonPid() (int, error) {
 }
 
 func SignalDaemon(signal syscall.Signal) error {
-	pid, err := readDaemonPid()
-	if err != nil {
-		return err
-	}
-	err = syscall.Kill(pid, signal)
-	return err
+	//todo send signal to daemon
+	//pid, err := readDaemonPid()
+	//if err != nil {
+	//	return err
+	//}
+	//err = syscall.(pid, signal)
+	return errors.New("not implemented")
 }
 
 func GracefullyStopDaemon() error {
@@ -158,10 +164,11 @@ func GracefullyStopDaemon() error {
 	return nil
 }
 
-func ReloadDaemon() error {
-	err := SignalDaemon(syscall.SIGUSR1)
-	if err != nil {
-		return fmt.Errorf("stop error: %s", err)
-	}
-	return nil
+func reloadDaemon() error {
+	//todo reload daemon
+	//err := SignalDaemon(syscall.SIGUSR1)
+	//if err != nil {
+	//	return fmt.Errorf("stop error: %s", err)
+	//}
+	return errors.New("not implemented")
 }

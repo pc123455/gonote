@@ -1,10 +1,10 @@
 base:
-  pid: /tmp/gonote.pid
+  pid: gonote.pid
 net:
   bind: 0.0.0.0
   port: 8088
 log:
-  file: /tmp/gonote.log
+  file: gonote.log
   level: info
 mysql:
   uri: developer:Travelcloud208!@tcp(10.223.224.72)/hybrid01_message_bus?charset=utf8

@@ -38,6 +38,11 @@ func (this *Response) Write() {
 	this.Writer.Write(this.content)
 }
 
+func (this *Response) Flush() {
+	this.status = 200
+	this.content = make([]byte, 0)
+}
+
 func (this *Response) SetStatus(status int) {
 	this.status = status
 }

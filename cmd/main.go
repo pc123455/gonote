@@ -1,18 +1,18 @@
-package main
+package cmd
 
 import (
-	"gonote/application"
+	app "gonote/internal/app"
 	"gonote/web"
 )
 
 func main() {
-	application.Main()
-	server := &application.Server
+	app.Main()
+	server := &app.Server
 
 	server.Post("/create", web.Create)
 	server.Put("/fix/<uuid>", web.Update)
 	server.Delete("/del/<uuid>", web.Delete)
 	server.Get("/get/find", web.Get)
 
-	application.Run()
+	app.Run()
 }

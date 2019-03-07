@@ -1,10 +1,10 @@
-package framework
+package pkg
 
 import (
 	"context"
 	"fmt"
-	"gonote/framework/logger"
-	"gonote/framework/route"
+	"gonote/pkg/logger"
+	"gonote/pkg/route"
 	"net"
 	"net/http"
 	"path"

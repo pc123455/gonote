@@ -1,8 +1,8 @@
 package web
 
 import (
-	app "gonote/application"
-	"gonote/framework/utils"
+	"gonote/internal/app"
+	"gonote/pkg/utils"
 )
 
 type Note struct {

@@ -1,8 +1,8 @@
 package route
 
 import (
-	"gonote/framework/context"
-	"gonote/framework/logger"
+	"gonote/pkg/context"
+	"gonote/pkg/logger"
 )
 
 type fixRoute map[string]func(ctx *context.Context)

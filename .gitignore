@@ -1,4 +1,6 @@
 .idea
+bin/
+build/
 log.txt
 config.yml
 gonote.logs

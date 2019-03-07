@@ -1,11 +1,11 @@
-package framework
+package pkg
 
 import (
 	"errors"
 	"go/types"
-	"gonote/framework/context"
-	"gonote/framework/logger"
-	"gonote/framework/route"
+	"gonote/pkg/context"
+	"gonote/pkg/logger"
+	"gonote/pkg/route"
 	"net/http"
 	"runtime/debug"
 	"strings"
@@ -102,7 +102,9 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	currentStage := PreAccessStage
 	handlerIndex := 0
 	var currentHandlers []HandlerFunc
+
 	//config phase
+loop:
 	for {
 		switch currentStage {
 		case PreAccessStage:
@@ -123,11 +125,10 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			continue
 		case AfterContentProcessStage:
 			currentHandlers = h.afterContentHandlers
-			ctx.Output.Write()
 		case LogStage:
 			currentHandlers = h.logHandlers
 		default:
-			break
+			break loop
 		}
 
 		length := len(currentHandlers)

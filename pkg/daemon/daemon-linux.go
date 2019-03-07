@@ -5,7 +5,7 @@ package daemon
 import (
 	"errors"
 	"fmt"
-	"gonote/framework/logger"
+	"gonote/pkg/frameworkwork/logger"
 	"os"
 	"os/exec"
 	"strconv"

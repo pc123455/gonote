@@ -59,7 +59,9 @@ func Main() error {
 func Initialize() (err error) {
 
 	Config = config.ParseConfigFromFile(Args.configFile)
-	logger.Initialize(Config.Log.File, Config.Log.Level)
+	logger.Init()
+	logger.SetOutputFile(Config.Log.File)
+	logger.SetLevel(Config.Log.Level)
 
 	if Args.daemon {
 		_, err = daemon.Daemon(0, 1, Config.Base.Pid)

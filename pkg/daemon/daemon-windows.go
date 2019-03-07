@@ -5,7 +5,6 @@ package daemon
 import (
 	"errors"
 	"fmt"
-	"gonote/pkg/logger"
 	"os"
 	"os/exec"
 	"strconv"
@@ -64,8 +63,8 @@ func Daemon(nochdir, noclose int, pidFilename string) (int, error) {
 		//files[0], files[1], files[2] = nullDev, nullDev, nullDev
 	} else {
 		cmd.Stdin = nullDev
-		cmd.Stdout = logger.LogFile
-		cmd.Stderr = logger.LogFile
+		cmd.Stdout = nullDev
+		cmd.Stderr = nullDev
 		//files[0], files[1], files[2] = os.Stdin, os.Stdout, os.Stderr
 	}
 

@@ -1,4 +1,4 @@
-package cmd
+package main
 
 import (
 	app "gonote/internal/app"

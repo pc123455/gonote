@@ -44,13 +44,17 @@ func cleanPath(p string) string {
 type ErrorHandlerMap map[int]HandlerFunc
 
 type Server struct {
-	BindIP   string
-	Port     int
-	server   *http.Server
-	handler  *Handler
-	listener *Listener
+	BindIP  string
+	Port    int
+	server  *http.Server
+	handler *Handler
+	//listener *Listener
 	doneChan chan struct{}
 	mu       sync.RWMutex
+}
+
+func (s *Server) AppendStageHandlerFunc(stage int, handler HandlerFunc) {
+	s.handler.AppendStageHandlerFunc(stage, handler)
 }
 
 func (s *Server) Get(pattern string, handler HandlerFunc) {
@@ -77,14 +81,6 @@ func (s *Server) Initialize(ip string, port int) error {
 	}
 	s.handler.Initialize()
 
-	//ln, err := net.Listen("tcp", fmt.Sprintf(":%v", port))
-	//if err != nil {
-	//	return err
-	//}
-	//s.listener = &Listener{
-	//	ln: ln,
-	//}
-
 	s.server = &http.Server{
 		Addr:           fmt.Sprintf(":%v", port),
 		Handler:        s.handler,
@@ -110,27 +106,4 @@ func (s *Server) Wait() {
 func (s *Server) Shutdown() {
 	s.server.Shutdown(context.Background())
 	//close(s.doneChan)
-}
-
-type Listener struct {
-	ln     net.Listener
-	connWg sync.WaitGroup
-}
-
-func (l *Listener) Accept() (net.Conn, error) {
-	l.connWg.Add(1)
-	return l.ln.Accept()
-}
-
-func (l *Listener) Close() error {
-	l.connWg.Done()
-	return l.ln.Close()
-}
-
-func (l *Listener) Addr() net.Addr {
-	return l.ln.Addr()
-}
-
-func (l *Listener) Wait() {
-	l.connWg.Wait()
 }
